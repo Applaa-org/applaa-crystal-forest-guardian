@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Guardian of the Eternal Grove</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #228b22 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0f2fe;
+            overflow: hidden;
+        }
+        #gameContainer {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        #gameCanvas {
+            border: 3px solid #4ade80;
+            border-radius: 12px;
+            background: linear-gradient(to bottom, #90ee90, #228b22);
+            box-shadow: 0 6px 24px rgba(74, 222, 128, 0.4);
+            display: block;
+            margin: 20px auto;
+            cursor: pointer;
+        }
+        h1 {
+            color: #4ade80;
+            margin-bottom: 10px;
+            font-size: 32px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(to right, #4ade80, #22c55e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .info {
+            color: #bfdbfe;
+            font-size: 16px;
+            margin-bottom: 20px;
+            line-height: 1.4;
+            max-width: 600px;
+        }
+        .controls {
+            margin-top: 15px;
+            color: #bfdbfe;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .status {
+            margin-top: 10px;
+            color: #4ade80;
+            font-size: 14px;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        .win-message {
+            color: #fbbf24;
+            font-size: 18px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes glow {
+            from { text-shadow: 0 0 5px #fbbf24; }
+            to { text-shadow: 0 0 20px #fbbf24, 0 0 30px #fbbf24; }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <h1>🌿 Guardian of the Eternal Grove</h1>
+        <div class="info">A mystical forest is dying from stolen elemental crystals. As the young guardian, explore, jump across platforms, avoid shadow spirits, collect the crystal, and restore it to the ancient tree shrine to bring balance back.</div>
+        <canvas id="gameCanvas" width="1024" height="576"></canvas>
+        <div class="status" id="status">Explore the grove and restore the crystal!</div>
+        <div class="controls">
+            Controls: Arrow Keys or WASD to move left/right, Up/W or Space to jump. Collect the glowing crystal and bring it to the shrine.
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusElement = document.getElementById('status');
+
+        // Game constants
+        const GRAVITY = 0.8;
+        const JUMP_STRENGTH = -16;
+        const MOVE_SPEED = 5;
+        const WORLD_WIDTH = 2048; // Wider world for exploration
+        const WORLD_HEIGHT = canvas.height;
+
+        // Input handling
+        const keys = {};
+        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        // Player object
+        const player = {
+            x: 100,
+            y: 300,
+            width: 32,
+            height: 48,
+            vx: 0,
+            vy: 0,
+            onGround: false,
+            hasCrystal: false,
+            color: '#4ade80' // Guardian green
+        };
+
+        // Platforms (simple forest floor and floating logs/shrines)
+        const platforms = [
+            { x: 0, y: 400, width: WORLD_WIDTH, height: 176, color: '#8b4513' }, // Forest floor
+            { x: 300, y: 300, width: 200, height: 20, color: '#cd853f' }, // Log platform 1
+            { x: 600, y: 200, width: 150, height: 20, color: '#cd853f' }, // Log platform 2
+            { x: 900, y: 350, width: 180, height: 20, color: '#cd853f' }, // Log platform 3
+            { x: 1400, y: 250, width: 200, height: 20, color: '#228b22' } // Shrine base
+        ];
+
+        // Enemy: Shadow spirit (patrols horizontally)
+        const enemy = {
+            x: 800,
+            y: 380,
+            width: 32,
+            height: 32,
+            vx: -2,
+            color: '#4b5563', // Shadow gray
+            patrolRange: { min: 700, max: 1000 }
+        };
+
+        // Crystal item
+        const crystal = {
+            x: 500,
+            y: 250,
+            width: 24,
+            height: 24,
+            collected: false,
+            color: '#ffd700' // Glowing gold
+        };
+
+        // Tree shrine (goal)
+        const shrine = {
+            x: 1600,
+            y: 200,
+            width: 64,
+            height: 200,
+            restored: false,
+            color: '#8b4513' // Ancient tree brown
+        };
+
+        // Camera (follows player)
+        const camera = { x: 0, y: 0 };
+
+        // Collision detection
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // Update player
+        function updatePlayer() {
+            // Horizontal movement
+            if (keys['a'] || keys['arrowleft']) player.vx = -MOVE_SPEED;
+            else if (keys['d'] || keys['arrowright']) player.vx = MOVE_SPEED;
+            else player.vx *= 0.8; // Friction
+
+            // Jump
+            if ((keys['w'] || keys['arrowup'] || keys[' ']) && player.onGround) {
+                player.vy = JUMP_STRENGTH;
+                player.onGround = false;
+            }
+
+            // Apply gravity
+            player.vy += GRAVITY;
+            player.x += player.vx;
+            player.y += player.vy;
+
+            // Platform collisions
+            player.onGround = false;
+            platforms.forEach(platform => {
+                if (checkCollision(player, platform)) {
+                    if (player.vy > 0 && player.y < platform.y) { // Landing from above
+                        player.y = platform.y - player.height;
+                        player.vy = 0;
+                        player.onGround = true;
+                    } else if (player.vx > 0 && player.x < platform.x) { // Hit wall right
+                        player.x = platform.x - player.width;
+                    } else if (player.vx < 0 && player.x + player.width > platform.x + platform.width) { // Hit wall left
+                        player.x = platform.x + platform.width;
+                    }
+                }
+            });
+
+            // World bounds
+            if (player.x < 0) player.x = 0;
+            if (player.x > WORLD_WIDTH - player.width) player.x = WORLD_WIDTH - player.width;
+            if (player.y > WORLD_HEIGHT - player.height) {
+                player.y = WORLD_HEIGHT - player.height;
+                player.vy = 0;
+                player.onGround = true;
+            }
+
+            // Collect crystal
+            if (!crystal.collected && checkCollision(player, crystal)) {
+                crystal.collected = true;
+                player.hasCrystal = true;
+                statusElement.textContent = 'Crystal collected! Bring it to the shrine.';
+            }
+
+            // Restore at shrine
+            if (player.hasCrystal && !shrine.restored && checkCollision(player, shrine)) {
+                shrine.restored = true;
+                statusElement.innerHTML = '<span class="win-message">Balance restored! You win! 🌟</span>';
+                player.hasCrystal = false;
+            }
+
+            // Enemy collision (simple damage/reset)
+            if (checkCollision(player, enemy)) {
+                player.x = 100;
+                player.y = 300;
+                player.vx = 0;
+                player.vy = 0;
+                statusElement.textContent = 'Touched by shadow! Respawning...';
+            }
+        }
+
+        // Update enemy (patrol)
+        function updateEnemy() {
+            enemy.x += enemy.vx;
+            if (enemy.x <= enemy.patrolRange.min || enemy.x >= enemy.patrolRange.max) {
+                enemy.vx *= -1;
+            }
+        }
+
+        // Update camera
+        function updateCamera() {
+            camera.x = player.x - canvas.width / 2;
+            if (camera.x < 0) camera.x = 0;
+            if (camera.x > WORLD_WIDTH - canvas.width) camera.x = WORLD_WIDTH - canvas.width;
+            camera.y = 0; // Fixed vertical for now
+        }
+
+        // Render
+        function render() {
+            // Clear with forest background
+            ctx.fillStyle = '#90ee90';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Save context for camera
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw platforms
+            platforms.forEach(platform => {
+                ctx.fillStyle = platform.color;
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                // Add some grass texture simulation
+                ctx.fillStyle = 'rgba(34, 139, 34, 0.3)';
+                ctx.fillRect(platform.x, platform.y - 5, platform.width, 5);
+            });
+
+            // Draw enemy (shadow wisp)
+            ctx.fillStyle = enemy.color;
+            ctx.shadowColor = '#1f2937';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.width / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Draw crystal if not collected
+            if (!crystal.collected) {
+                ctx.fillStyle = crystal.color;
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.moveTo(crystal.x + crystal.width / 2, crystal.y);
+                ctx.lineTo(crystal.x + crystal.width, crystal.y + crystal.height);
+                ctx.lineTo(crystal.x, crystal.y + crystal.height);
+                ctx.closePath();
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw shrine (simple tree)
+            ctx.fillStyle = shrine.color;
+            ctx.fillRect(shrine.x, shrine.y + 50, shrine.width, shrine.height - 50); // Trunk
+            ctx.fillStyle = '#228b22';
+            ctx.beginPath();
+            ctx.arc(shrine.x + shrine.width / 2, shrine.y + 50, 40, 0, Math.PI * 2); // Canopy
+            ctx.fill();
+            if (shrine.restored) {
+                ctx.fillStyle = '#4ade80';
+                ctx.shadowBlur = 20;
+                ctx.beginPath();
+                ctx.arc(shrine.x + shrine.width / 2, shrine.y + 25, 30, 0, Math.PI * 2); // Glow
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw player (simple guardian figure)
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            // Head
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(player.x + player.width / 2, player.y + 10, 8, 0, Math.PI * 2);
+            ctx.fill();
+            // If has crystal, show held item
+            if (player.hasCrystal) {
+                ctx.fillStyle = '#ffd700';
+                ctx.fillRect(player.x + player.width, player.y + 20, 12, 12);
+            }
+
+            ctx.restore();
+        }
+
+        // Game loop
+        function gameLoop() {
+            updatePlayer();
+            updateEnemy();
+            updateCamera();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        statusElement.textContent = 'Game started! Explore the mystical forest.';
+        gameLoop();
+
+        console.log('🌿 Guardian of the Eternal Grove loaded! A calm action adventure awaits.');
+    </script>
+</body>
+</html>
