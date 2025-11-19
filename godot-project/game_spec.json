@@ -1,0 +1,98 @@
+{
+  "game": {
+    "name": "Guardian of the Eternal Grove",
+    "type": "2D",
+    "description": "In a mystical forest dying from the theft of ancient elemental crystals by shadow spirits, play as the young guardian tasked with exploring lush regions, solving nature-based puzzles, battling shadowy foes, and restoring balance by returning crystals to giant tree shrines. A magical, calm yet adventurous journey through a vibrant, nature-themed world.",
+    "genre": "action",
+    "version": "1.0.0"
+  },
+  "settings": {
+    "window": {
+      "width": 1280,
+      "height": 720,
+      "resizable": true,
+      "fullscreen": false
+    },
+    "physics": {
+      "enabled": true
+    },
+    "rendering": {}
+  },
+  "scenes": [],
+  "assets": {
+    "sprites": [
+      {
+        "name": "player_idle",
+        "path": "res://assets/sprites/player_idle.png",
+        "type": "character"
+      },
+      {
+        "name": "player_jump",
+        "path": "res://assets/sprites/player_jump.png",
+        "type": "character"
+      },
+      {
+        "name": "shadow_wisp",
+        "path": "res://assets/sprites/shadow_wisp.png",
+        "type": "enemy"
+      },
+      {
+        "name": "shadow_brute",
+        "path": "res://assets/sprites/shadow_brute.png",
+        "type": "enemy"
+      },
+      {
+        "name": "boss_shadow",
+        "path": "res://assets/sprites/boss_shadow.png",
+        "type": "enemy"
+      },
+      {
+        "name": "crystal",
+        "path": "res://assets/sprites/crystal.png",
+        "type": "item"
+      },
+      {
+        "name": "tree_shrine",
+        "path": "res://assets/sprites/tree_shrine.png",
+        "type": "environment"
+      }
+    ],
+    "sounds": [
+      {
+        "name": "magic_bolt",
+        "path": "res://assets/sounds/magic_bolt.wav",
+        "type": "sfx"
+      },
+      {
+        "name": "puzzle_solve",
+        "path": "res://assets/sounds/puzzle_solve.wav",
+        "type": "sfx"
+      },
+      {
+        "name": "enemy_hit",
+        "path": "res://assets/sounds/enemy_hit.wav",
+        "type": "sfx"
+      },
+      {
+        "name": "crystal_restore",
+        "path": "res://assets/sounds/crystal_restore.wav",
+        "type": "sfx"
+      }
+    ],
+    "music": [
+      {
+        "name": "forest_ambient",
+        "path": "res://assets/music/forest_ambient.ogg"
+      },
+      {
+        "name": "adventure_theme",
+        "path": "res://assets/music/adventure_theme.ogg"
+      },
+      {
+        "name": "boss_battle",
+        "path": "res://assets/music/boss_battle.ogg"
+      }
+    ]
+  },
+  "scripts": []
+}
