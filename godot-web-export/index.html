@@ -28,6 +28,7 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 1100px;
         }
         #gameCanvas {
             border: 3px solid #4ade80;
@@ -55,14 +56,34 @@
             line-height: 1.4;
             max-width: 600px;
         }
-        .controls {
+        .how-to-play {
             margin-top: 15px;
             color: #bfdbfe;
             font-size: 14px;
             background: rgba(255, 255, 255, 0.1);
-            padding: 12px;
+            padding: 16px;
             border-radius: 8px;
             border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: left;
+        }
+        .how-to-play h3 {
+            color: #4ade80;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .how-to-play ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .how-to-play li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+        .how-to-play li:before {
+            content: "🌿";
+            position: absolute;
+            left: 0;
         }
         .status {
             margin-top: 10px;
@@ -76,9 +97,17 @@
             font-size: 18px;
             animation: glow 2s ease-in-out infinite alternate;
         }
+        .lose-message {
+            color: #ef4444;
+            animation: pulse 1s ease-in-out;
+        }
         @keyframes glow {
             from { text-shadow: 0 0 5px #fbbf24; }
             to { text-shadow: 0 0 20px #fbbf24, 0 0 30px #fbbf24; }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
     </style>
 </head>
@@ -88,8 +117,14 @@
         <div class="info">A mystical forest is dying from stolen elemental crystals. As the young guardian, explore, jump across platforms, avoid shadow spirits, collect the crystal, and restore it to the ancient tree shrine to bring balance back.</div>
         <canvas id="gameCanvas" width="1024" height="576"></canvas>
         <div class="status" id="status">Explore the grove and restore the crystal!</div>
-        <div class="controls">
-            Controls: Arrow Keys or WASD to move left/right, Up/W or Space to jump. Collect the glowing crystal and bring it to the shrine.
+        <div class="how-to-play">
+            <h3>How to Play</h3>
+            <ul>
+                <li><strong>Movement:</strong> Use Arrow Keys (Left/Right) or WASD (A/D) to move the guardian left and right across the mystical forest.</li>
+                <li><strong>Jumping:</strong> Press Up Arrow, W, or Spacebar to jump onto floating log platforms and navigate the terrain. Double-tap for higher jumps if needed.</li>
+                <li><strong>Objective:</strong> Explore the grove (the world scrolls as you move right), avoid touching the patrolling shadow spirit (it resets you if hit), collect the glowing golden crystal on a platform, then carry it to the ancient tree shrine on the far right to restore balance and win.</li>
+                <li><strong>Tips:</strong> Jump carefully to reach higher platforms. The forest is wider than the screen—keep moving right to progress. If you fall off, you'll land on the forest floor. No time limit; take your time in this calm adventure. Touching the shadow causes a respawn—try to sneak past!</li>
+            </ul>
         </div>
     </div>
     <script>
@@ -98,16 +133,25 @@
         const statusElement = document.getElementById('status');
 
         // Game constants
-        const GRAVITY = 0.8;
-        const JUMP_STRENGTH = -16;
-        const MOVE_SPEED = 5;
-        const WORLD_WIDTH = 2048; // Wider world for exploration
+        const GRAVITY = 0.6; // Smoother gravity
+        const JUMP_STRENGTH = -18; // Stronger jump for better playability
+        const MOVE_SPEED = 6; // Faster movement
+        const FRICTION = 0.85;
+        const WORLD_WIDTH = 2560; // Even wider for more exploration
         const WORLD_HEIGHT = canvas.height;
 
-        // Input handling
+        // Input handling (improved for spacebar and prevent default)
         const keys = {};
-        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
-        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key === ' ' || key === 'arrowup' || key === 'w' || key === 'a' || key === 'd' || key === 'arrowleft' || key === 'arrowright') {
+                e.preventDefault(); // Prevent page scroll
+            }
+            keys[key] || (keys[key] = true);
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
 
         // Player object
         const player = {
@@ -122,50 +166,55 @@
             color: '#4ade80' // Guardian green
         };
 
-        // Platforms (simple forest floor and floating logs/shrines)
+        // More platforms for better exploration and playability
         const platforms = [
-            { x: 0, y: 400, width: WORLD_WIDTH, height: 176, color: '#8b4513' }, // Forest floor
-            { x: 300, y: 300, width: 200, height: 20, color: '#cd853f' }, // Log platform 1
-            { x: 600, y: 200, width: 150, height: 20, color: '#cd853f' }, // Log platform 2
-            { x: 900, y: 350, width: 180, height: 20, color: '#cd853f' }, // Log platform 3
-            { x: 1400, y: 250, width: 200, height: 20, color: '#228b22' } // Shrine base
+            { x: 0, y: 450, width: WORLD_WIDTH, height: 126, color: '#8b4513' }, // Forest floor (lower for more jump room)
+            { x: 200, y: 350, width: 150, height: 20, color: '#cd853f' }, // Log 1
+            { x: 400, y: 250, width: 200, height: 20, color: '#cd853f' }, // Log 2 (higher)
+            { x: 650, y: 380, width: 120, height: 20, color: '#228b22' }, // Mossy platform
+            { x: 850, y: 200, width: 180, height: 20, color: '#cd853f' }, // Log 3
+            { x: 1100, y: 320, width: 160, height: 20, color: '#8b4513' }, // Root platform
+            { x: 1350, y: 280, width: 140, height: 20, color: '#cd853f' }, // Log 4
+            { x: 1600, y: 150, width: 200, height: 20, color: '#228b22' }, // High platform near shrine
+            { x: 1900, y: 400, width: 150, height: 20, color: '#8b4513' }, // Final approach
+            { x: 2200, y: 250, width: 360, height: 20, color: '#228b22' } // Shrine base (extended)
         ];
 
-        // Enemy: Shadow spirit (patrols horizontally)
+        // Enemy: Shadow spirit (patrols with better range)
         const enemy = {
-            x: 800,
-            y: 380,
+            x: 900,
+            y: 430,
             width: 32,
             height: 32,
-            vx: -2,
+            vx: -1.5,
             color: '#4b5563', // Shadow gray
-            patrolRange: { min: 700, max: 1000 }
+            patrolRange: { min: 750, max: 1200 }
         };
 
-        // Crystal item
+        // Crystal item (on a reachable platform)
         const crystal = {
-            x: 500,
-            y: 250,
+            x: 450,
+            y: 220, // Above log 2
             width: 24,
             height: 24,
             collected: false,
             color: '#ffd700' // Glowing gold
         };
 
-        // Tree shrine (goal)
+        // Tree shrine (goal, on extended base)
         const shrine = {
-            x: 1600,
+            x: 2250,
             y: 200,
-            width: 64,
-            height: 200,
+            width: 80,
+            height: 250,
             restored: false,
             color: '#8b4513' // Ancient tree brown
         };
 
-        // Camera (follows player)
-        const camera = { x: 0, y: 0 };
+        // Camera (smooth follow)
+        const camera = { x: 0, y: 0, targetX: 0 };
 
-        // Collision detection
+        // Improved collision detection (AABB with side/bottom/top resolution)
         function checkCollision(rect1, rect2) {
             return rect1.x < rect2.x + rect2.width &&
                    rect1.x + rect1.width > rect2.x &&
@@ -173,74 +222,102 @@
                    rect1.y + rect1.height > rect2.y;
         }
 
-        // Update player
+        // Update player with refined physics and collisions
         function updatePlayer() {
-            // Horizontal movement
-            if (keys['a'] || keys['arrowleft']) player.vx = -MOVE_SPEED;
-            else if (keys['d'] || keys['arrowright']) player.vx = MOVE_SPEED;
-            else player.vx *= 0.8; // Friction
+            // Horizontal input
+            let movingLeft = keys['a'] || keys['arrowleft'];
+            let movingRight = keys['d'] || keys['arrowright'];
+            if (movingLeft) player.vx = Math.max(player.vx - 0.5, -MOVE_SPEED);
+            if (movingRight) player.vx = Math.min(player.vx + 0.5, MOVE_SPEED);
+            else player.vx *= FRICTION;
 
-            // Jump
+            // Jump input
             if ((keys['w'] || keys['arrowup'] || keys[' ']) && player.onGround) {
                 player.vy = JUMP_STRENGTH;
                 player.onGround = false;
+                keys['w'] = keys['arrowup'] = keys[' '] = false; // Prevent double jump
             }
 
             // Apply gravity
             player.vy += GRAVITY;
-            player.x += player.vx;
-            player.y += player.vy;
 
-            // Platform collisions
+            // Horizontal movement with wall collision
+            let newX = player.x + player.vx;
             player.onGround = false;
+            let colliding = false;
+
             platforms.forEach(platform => {
-                if (checkCollision(player, platform)) {
-                    if (player.vy > 0 && player.y < platform.y) { // Landing from above
+                let testRect = { ...player, x: newX };
+                if (checkCollision(testRect, platform)) {
+                    if (player.vx > 0) { // Moving right
+                        player.x = platform.x - player.width;
+                    } else if (player.vx < 0) { // Moving left
+                        player.x = platform.x + platform.width;
+                    }
+                    player.vx = 0;
+                    colliding = true;
+                }
+            });
+            if (!colliding) player.x = newX;
+
+            // Vertical movement with ground collision
+            let newY = player.y + player.vy;
+            colliding = false;
+
+            platforms.forEach(platform => {
+                let testRect = { ...player, y: newY };
+                if (checkCollision(testRect, platform)) {
+                    if (player.vy > 0) { // Falling
                         player.y = platform.y - player.height;
                         player.vy = 0;
                         player.onGround = true;
-                    } else if (player.vx > 0 && player.x < platform.x) { // Hit wall right
-                        player.x = platform.x - player.width;
-                    } else if (player.vx < 0 && player.x + player.width > platform.x + platform.width) { // Hit wall left
-                        player.x = platform.x + platform.width;
+                    } else if (player.vy < 0) { // Jumping up
+                        player.y = platform.y + platform.height;
+                        player.vy = 0;
                     }
+                    colliding = true;
                 }
             });
+            if (!colliding) player.y = newY;
 
             // World bounds
-            if (player.x < 0) player.x = 0;
-            if (player.x > WORLD_WIDTH - player.width) player.x = WORLD_WIDTH - player.width;
+            if (player.x < 0) { player.x = 0; player.vx = 0; }
+            if (player.x > WORLD_WIDTH - player.width) { player.x = WORLD_WIDTH - player.width; player.vx = 0; }
             if (player.y > WORLD_HEIGHT - player.height) {
                 player.y = WORLD_HEIGHT - player.height;
                 player.vy = 0;
                 player.onGround = true;
             }
+            if (player.y < 0) { player.y = 0; player.vy = 0; }
 
             // Collect crystal
             if (!crystal.collected && checkCollision(player, crystal)) {
                 crystal.collected = true;
                 player.hasCrystal = true;
-                statusElement.textContent = 'Crystal collected! Bring it to the shrine.';
+                statusElement.textContent = 'Crystal collected! 🌟 Now bring it to the shrine on the far right.';
             }
 
             // Restore at shrine
-            if (player.hasCrystal && !shrine.restored && checkCollision(player, shrine)) {
+            if (player.hasCrystal && !shrine.restored && checkCollision(player, { ...shrine, y: shrine.y + 50 })) { // Check against trunk
                 shrine.restored = true;
-                statusElement.innerHTML = '<span class="win-message">Balance restored! You win! 🌟</span>';
+                statusElement.innerHTML = '<span class="win-message">Balance restored! The forest is saved! 🌳✨</span>';
                 player.hasCrystal = false;
             }
 
-            // Enemy collision (simple damage/reset)
+            // Enemy collision (reset to start)
             if (checkCollision(player, enemy)) {
                 player.x = 100;
                 player.y = 300;
                 player.vx = 0;
                 player.vy = 0;
-                statusElement.textContent = 'Touched by shadow! Respawning...';
+                player.hasCrystal = false;
+                crystal.collected = false;
+                statusElement.innerHTML = '<span class="lose-message">Touched by shadow spirit! Respawning... 👻</span>';
+                setTimeout(() => { statusElement.textContent = 'Explore the grove and restore the crystal!'; }, 2000);
             }
         }
 
-        // Update enemy (patrol)
+        // Update enemy (smoother patrol)
         function updateEnemy() {
             enemy.x += enemy.vx;
             if (enemy.x <= enemy.patrolRange.min || enemy.x >= enemy.patrolRange.max) {
@@ -248,47 +325,58 @@
             }
         }
 
-        // Update camera
+        // Smooth camera follow
         function updateCamera() {
-            camera.x = player.x - canvas.width / 2;
+            camera.targetX = player.x - canvas.width / 2;
+            camera.x += (camera.targetX - camera.x) * 0.1; // Lerp for smoothness
             if (camera.x < 0) camera.x = 0;
             if (camera.x > WORLD_WIDTH - canvas.width) camera.x = WORLD_WIDTH - canvas.width;
-            camera.y = 0; // Fixed vertical for now
+            camera.y = 0;
         }
 
-        // Render
+        // Render with more details
         function render() {
-            // Clear with forest background
-            ctx.fillStyle = '#90ee90';
+            // Forest background gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#90ee90');
+            gradient.addColorStop(1, '#228b22');
+            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Save context for camera
+            // Clouds/simple parallax (for atmosphere)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.beginPath();
+            ctx.arc(200 - camera.x * 0.5, 100, 30, 0, Math.PI * 2); // Parallax cloud
+            ctx.arc(500 - camera.x * 0.5, 80, 40, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.save();
             ctx.translate(-camera.x, -camera.y);
 
-            // Draw platforms
+            // Draw platforms with texture
             platforms.forEach(platform => {
                 ctx.fillStyle = platform.color;
                 ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
-                // Add some grass texture simulation
-                ctx.fillStyle = 'rgba(34, 139, 34, 0.3)';
-                ctx.fillRect(platform.x, platform.y - 5, platform.width, 5);
+                // Grass/moss overlay
+                ctx.fillStyle = 'rgba(34, 139, 34, 0.4)';
+                ctx.fillRect(platform.x, platform.y - 8, platform.width, 8);
             });
 
-            // Draw enemy (shadow wisp)
+            // Draw enemy with glow
             ctx.fillStyle = enemy.color;
             ctx.shadowColor = '#1f2937';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 15;
             ctx.beginPath();
             ctx.arc(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.width / 2, 0, Math.PI * 2);
             ctx.fill();
             ctx.shadowBlur = 0;
 
-            // Draw crystal if not collected
+            // Draw crystal if not collected (with pulse animation)
             if (!crystal.collected) {
-                ctx.fillStyle = crystal.color;
+                const pulse = Math.sin(Date.now() / 300) * 5 + 5;
                 ctx.shadowColor = '#ffd700';
-                ctx.shadowBlur = 15;
+                ctx.shadowBlur = 20 + pulse;
+                ctx.fillStyle = crystal.color;
                 ctx.beginPath();
                 ctx.moveTo(crystal.x + crystal.width / 2, crystal.y);
                 ctx.lineTo(crystal.x + crystal.width, crystal.y + crystal.height);
@@ -298,23 +386,24 @@
                 ctx.shadowBlur = 0;
             }
 
-            // Draw shrine (simple tree)
+            // Draw shrine (enhanced tree)
             ctx.fillStyle = shrine.color;
-            ctx.fillRect(shrine.x, shrine.y + 50, shrine.width, shrine.height - 50); // Trunk
+            ctx.fillRect(shrine.x, shrine.y + 100, shrine.width, shrine.height - 100); // Trunk
             ctx.fillStyle = '#228b22';
             ctx.beginPath();
-            ctx.arc(shrine.x + shrine.width / 2, shrine.y + 50, 40, 0, Math.PI * 2); // Canopy
+            ctx.ellipse(shrine.x + shrine.width / 2, shrine.y + 80, 50, 60, 0, 0, Math.PI * 2); // Canopy
             ctx.fill();
             if (shrine.restored) {
                 ctx.fillStyle = '#4ade80';
-                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#4ade80';
+                ctx.shadowBlur = 25;
                 ctx.beginPath();
-                ctx.arc(shrine.x + shrine.width / 2, shrine.y + 25, 30, 0, Math.PI * 2); // Glow
+                ctx.arc(shrine.x + shrine.width / 2, shrine.y + 50, 40, 0, Math.PI * 2); // Restoration glow
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
 
-            // Draw player (simple guardian figure)
+            // Draw player (simple but visible)
             ctx.fillStyle = player.color;
             ctx.fillRect(player.x, player.y, player.width, player.height);
             // Head
@@ -322,29 +411,44 @@
             ctx.beginPath();
             ctx.arc(player.x + player.width / 2, player.y + 10, 8, 0, Math.PI * 2);
             ctx.fill();
-            // If has crystal, show held item
+            // Eyes
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(player.x + 12, player.y + 8, 2, 0, Math.PI * 2);
+            ctx.arc(player.x + 20, player.y + 8, 2, 0, Math.PI * 2);
+            ctx.fill();
+            // Held crystal
             if (player.hasCrystal) {
                 ctx.fillStyle = '#ffd700';
-                ctx.fillRect(player.x + player.width, player.y + 20, 12, 12);
+                ctx.shadowBlur = 10;
+                ctx.fillRect(player.x + player.width + 2, player.y + 20, 12, 12);
+                ctx.shadowBlur = 0;
             }
 
             ctx.restore();
         }
 
         // Game loop
-        function gameLoop() {
-            updatePlayer();
-            updateEnemy();
-            updateCamera();
-            render();
+        let lastTime = 0;
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            // Cap framerate for consistency
+            if (deltaTime > 16) {
+                updatePlayer();
+                updateEnemy();
+                updateCamera();
+                render();
+            }
             requestAnimationFrame(gameLoop);
         }
 
         // Start the game
-        statusElement.textContent = 'Game started! Explore the mystical forest.';
-        gameLoop();
+        statusElement.textContent = 'Game ready! Use arrow keys or WASD to start exploring. 🌲';
+        requestAnimationFrame(gameLoop);
 
-        console.log('🌿 Guardian of the Eternal Grove loaded! A calm action adventure awaits.');
+        console.log('🌿 Guardian of the Eternal Grove fully playable! Adventure awaits.');
     </script>
 </body>
 </html>
